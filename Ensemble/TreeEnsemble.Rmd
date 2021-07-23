@@ -1,0 +1,154 @@
+---
+title: "EnsembleTree"
+author: "18PCSA102"
+date: "2/28/2020"
+output: html_document
+---
+
+```{r}
+
+library(randomForest)
+library(xgboost)
+library(tidyverse)
+library(caret)
+options(warn = -1)
+set.seed(1)#300 #10 
+data<-read.csv(file.choose(),header=TRUE)
+str(data)
+sum(is.na(data))
+attach(data)
+data$class[G3>=10]<-"PASS"
+data$class[G3<10]<-"FAIL"
+data<-data[c(-18)]
+data$class<-as.factor(data$class)
+
+#Spliting training set into two parts based on outcome: 
+index <- createDataPartition(data$class, p=0.80, list=FALSE)
+trainSet <- data[ index,]
+testSet <- data[-index,]
+
+#Defining the training controls for multiple models
+fitControl <- trainControl(
+  method = "cv",
+  number = 5,
+  savePredictions = 'final',
+  classProbs = T)
+
+#Defining the predictors and outcome
+predictors<-c("failures","studytime","G2","higher","absences","goout","Walc","famrel","reason","Fedu","internet","Fjob","traveltime","guardian","paid")
+response<-'class'
+```
+
+
+
+<h3>DECISION TREE C5.0</h3>
+
+```{r}
+model_gb<- train(trainSet[,predictors],trainSet[,response], method="C5.0",trControl=fitControl,tuneLength=3)
+
+#Predicting using gbm model
+testSet$pred_gb<-predict(object = model_gb,testSet[,predictors])
+confusionMatrix(testSet$class,testSet$pred_gb)
+mean(testSet$pred_gb == testSet$class)
+```
+
+<h3>DECISION TREE -RPART</h3>
+```{r}
+model_rf<-train(trainSet[,predictors],trainSet[,response],method="rpart",trControl=fitControl,tuneLength=3)
+
+testSet$pred_rf<-predict(object = model_rf,testSet[,predictors])
+confusionMatrix(testSet$class,testSet$pred_rf)
+mean(testSet$pred_rf == testSet$class)
+```
+
+
+<H3>RANDOM FOREST -</H3>
+```{r}
+#Training the Logistic regression model
+model_lr<-train(trainSet[,predictors],trainSet[,response],method='rf',ntree=450,trControl=fitControl,tuneLength=3)
+
+
+#Predicting using lr model
+testSet$pred_lr<-predict(object = model_lr,testSet[,predictors])
+confusionMatrix(testSet$class,testSet$pred_lr)
+mean(testSet$pred_lr == testSet$class)
+```
+
+
+<h3>AVERAGING</h3>
+```{r}  
+#Predicting the probabilities
+testSet$pred_rf_prob<-predict(object = model_rf,testSet[,predictors],type='prob')
+testSet$pred_gb_prob<-predict(object = model_gb,testSet[,predictors],type='prob')
+testSet$pred_lr_prob<-predict(object = model_lr,testSet[,predictors],type='prob')
+
+
+#Taking average of predictions
+testSet$pred_avg<-(testSet$pred_rf_prob$PASS+testSet$pred_gb_prob$PASS+testSet$pred_lr_prob$PASS)/3
+#Splitting into binary classes at 0.5
+testSet$pred_avg<-as.factor(ifelse(testSet$pred_avg>0.5,'PASS','FAIL'))
+confusionMatrix(testSet$class,testSet$pred_avg)
+#CALCULATING ACCURACY
+table_mat<-table(testSet$pred_avg,testSet$class)
+precision<-table_mat[2,2]/sum(diag(table_mat))
+cat("Precision",precision)
+
+recal<-table_mat[2,2]/sum(table_mat[2,2],table_mat[1,2])
+cat("Recall value",recal)
+
+fmeasure<-(2*precision*recal)/sum(precision,recal)
+cat("F-measure",fmeasure)
+
+accuracy_Test <- sum(diag(table_mat)) / sum(table_mat)
+print(paste('Accuracy', accuracy_Test))
+
+```
+
+<h3>MAJORITY VOTING</h3>
+```{r} 
+testSet$pred_majority<-as.factor(ifelse(testSet$pred_rf=='PASS' & testSet$pred_gb=='PASS','PASS',ifelse(testSet$pred_rf=='PASS' & testSet$pred_lr=='PASS','PASS',ifelse(testSet$pred_gb=='PASS' & testSet$pred_lr=='FAIL','FAIL','FAIL'))))
+
+
+confusionMatrix(testSet$class,testSet$pred_majority)
+
+#CALCULATING ACCURACY
+table_mat<-table(testSet$class,testSet$pred_majority)
+precision<-table_mat[2,2]/sum(diag(table_mat))
+cat("Precision",precision)
+
+recal<-table_mat[2,2]/sum(table_mat[2,2],table_mat[1,2])
+cat("Recall value",recal)
+
+fmeasure<-(2*precision*recal)/sum(precision,recal)
+cat("F-measure",fmeasure)
+
+accuracy_Test <- sum(diag(table_mat)) / sum(table_mat)
+print(paste('Accuracy', accuracy_Test))
+```
+
+<h3>Weighted average</h3>
+```{r}  
+ 
+#Taking weighted average of predictions
+testSet$pred_weighted_avg<-(testSet$pred_rf_prob$PASS*0.25)+(testSet$pred_gb_prob$PASS*0.25)+(testSet$pred_lr_prob$PASS*0.5)
+
+#Splitting into binary classes at 0.5
+testSet$pred_weighted_avg<-as.factor(ifelse(testSet$pred_weighted_avg>0.5,'PASS','FAIL'))
+
+#CALCULATING ACCURACY
+table_mat<-table(testSet$pred_weighted_avg,testSet$class)
+precision<-table_mat[2,2]/sum(diag(table_mat))
+cat("Precision",precision)
+
+recal<-table_mat[2,2]/sum(table_mat[2,2],table_mat[1,2])
+cat("Recall value",recal)
+
+fmeasure<-(2*precision*recal)/sum(precision,recal)
+cat("F-measure",fmeasure)
+
+accuracy_Test <- sum(diag(table_mat)) / sum(table_mat)
+print(paste('Accuracy', accuracy_Test))
+
+
+```
+

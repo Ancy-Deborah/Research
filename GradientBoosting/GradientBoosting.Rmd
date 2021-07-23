@@ -1,0 +1,84 @@
+---
+title: "GradientBoosting"
+author: "18PCSA102"
+date: "2/19/2020"
+output: html_document
+---
+
+```{r}
+
+library(tidyverse)
+
+library(caret)
+
+library(xgboost)
+
+stud <-read.csv(file.choose(),header = TRUE)
+
+#STEP2: Data cleaning
+
+stud<-na.omit(stud)
+stud$class[stud$G3>=10]<-'PASS'
+stud$class[stud$G3<10]<-'FAIL'
+attach(stud)
+stud<-stud[-c(32)]
+
+#STEP3:Create train/test set
+set.seed(200)
+shuffle_index <- sample(1:nrow(stud))
+head(shuffle_index)
+stud <- stud[shuffle_index, ]
+
+
+#create_train_test(stud, size = 0.8, train = TRUE)
+
+create_train_test <- function(data, size = 0.8, train = TRUE) {
+  n_row = nrow(data)
+  total_row = size * n_row
+  train_sample  <- 1: total_row
+  if (train == TRUE) {
+    return (data[train_sample, ])
+  } else {
+    return (data[-train_sample, ])
+  }
+}
+
+data_train <- create_train_test(stud, 0.8, train = TRUE)
+data_test <- create_train_test(stud, 0.8, train = FALSE)
+dim(data_train)
+dim(data_test)
+prop.table(table(data_train$class))
+
+
+
+model <- train(class~sex+school+address+Pstatus+failures+studytime+Medu+Fedu+traveltime+Fjob+Mjob+famrel+reason+Pstatus+famsize+schoolsup+famsup+age+guardian, data = data_train, method ="xgbTree", trControl = trainControl("cv", number=10))
+
+model$bestTune
+
+# Make predictions on the test data
+predicted.classes <-predict(model,data_test)
+table_mat<-table(predicted.classes,data_test$class)
+confusionMatrix(as.factor(data_test$class), predicted.classes)
+
+#ACCURACY=TP+TN/TP+TN+FP+FN
+#PRECISION=TP/TP+FP
+#RECALL=TP/TP+FN
+#FMEASEURE=2*Precision*recall/precision+recall
+
+precision<-table_mat[2,2]/sum(diag(table_mat))
+cat("Precision",precision)
+
+recal<-table_mat[2,2]/sum(table_mat[2,2],table_mat[1,2])
+cat("Recall value",recal)
+
+fmeasure<-(2*precision*recal)/sum(precision,recal)
+cat("F-measure",fmeasure)
+
+accuracy_Test <- sum(diag(table_mat)) / sum(table_mat)
+print(paste('Accuracy', accuracy_Test))
+
+#Variable importance
+varImp(model)
+
+```
+

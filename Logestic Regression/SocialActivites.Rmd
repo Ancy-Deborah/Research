@@ -1,0 +1,83 @@
+---
+title: "SocialActivities"
+author: "18PCSA102"
+date: "2/23/2020"
+output: html_document
+---
+
+```{r}
+dataset<-read.csv(file.choose(),header=TRUE)
+
+
+#STEP2: Data cleaning
+
+dataset<-na.omit(dataset)
+dataset$class[dataset$G3>=10]<-'PASS'
+dataset$class[dataset$G3<10]<-'FAIL'
+attach(dataset)
+dataset<-dataset[-c(33)]
+
+
+str(dataset)
+dataset$class<-as.factor(dataset$class)
+library(caTools)
+library(e1071)
+
+#install.packages("ROCR")
+library(ROCR)
+
+
+pass<-dataset[which(class=="PASS"),]
+fail<-dataset[which(class=="FAIL"),]
+
+set.seed(200)
+pass_train<-sample(1:nrow(pass),0.7*nrow(pass))
+fail_train<-sample(1:nrow(fail),0.7*nrow(fail))
+train_pass<-pass[pass_train,]
+train_fail<-fail[fail_train,]
+train<-rbind(train_pass,train_fail)
+table(train$class)
+
+test_pass <- pass[-pass_train, ]
+test_fail <- fail[-fail_train, ]
+data_test<- rbind(test_pass, test_fail)  # row bind the pass and fail
+
+table(data_test$class)
+table(train$class)
+
+mymodel<-glm(class~activities+higher+internet+nursery+paid+romantic+absences+health+freetime+goout+Dalc+Walc, family='binomial', data=train,maxit=100)
+
+mymodel
+summary(mymodel)
+
+predicted.classes<-predict(mymodel,data_test,type="response")
+
+ROCRPred<-prediction(predicted.classes,data_test$class)
+ROCRPref<-performance(ROCRPred,"tpr","fpr")
+
+plot(ROCRPref,colorize=TRUE,print.cutoffs.at=seq(0.1, by=0.1))
+
+#ACCURACY=TP+TN/TP+TN+FP+FN
+#PRECISION=TP/TP+FP
+#RECALL=TP/TP+FN
+#FMEASEURE=2*Precision*recall/precision+recall
+
+table_mat<-table(Actual_Value=data_test$class,Predicted_Value=predicted.classes>=0.5)
+table_mat
+
+
+precision<-table_mat[2,2]/sum(diag(table_mat))
+cat("Precision",precision)
+
+recal<-table_mat[2,2]/sum(table_mat[2,2],table_mat[1,2])
+cat("Recall value",recal)
+
+fmeasure<-(2*precision*recal)/sum(precision,recal)
+cat("F-measure",fmeasure)
+
+accuracy_Test <- sum(diag(table_mat)) / sum(table_mat)
+print(paste('Accuracy', accuracy_Test))
+
+
+```
+

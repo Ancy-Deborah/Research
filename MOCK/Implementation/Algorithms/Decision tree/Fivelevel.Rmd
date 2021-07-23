@@ -1,0 +1,116 @@
+---
+title: "Fivelevel"
+author: "18PCSA102"
+date: "2/4/2020"
+output: html_document
+---
+
+```{r}
+
+library(rpart)
+library(rpart.plot)
+
+#STEP1: Import the data
+
+stud <-read.table(file.choose(),header = TRUE,sep=';')
+
+#STEP2: Data cleaning
+stud<-na.omit(stud)
+stud$Grade1[stud$G1>=16 | stud$G1<=20]<-'A'
+stud$Grade1[stud$G1==14 | stud$G1==15]<-'B'
+stud$Grade1[stud$G1==12 | stud$G1==13]<-'C'
+stud$Grade1[stud$G1==10 | stud$G1==11]<-'D'
+stud$Grade1[stud$G1>=0 & stud$G1<=9]<-'E'
+
+
+stud$Grade2[stud$G2>=16 | stud$G2<=20]<-'A'
+stud$Grade2[stud$G2==14 | stud$G2==15]<-'B'
+stud$Grade2[stud$G2==12 | stud$G2==13]<-'C'
+stud$Grade2[stud$G2==10 | stud$G2==11]<-'D'
+stud$Grade2[stud$G2==0 | stud$G2==9]<-'E'
+
+
+stud$Grade3[stud$G3>=16 | stud$G3<=20]<-'A'
+stud$Grade3[stud$G3==14 | stud$G3==15]<-'B'
+stud$Grade3[stud$G3==12 | stud$G3==13]<-'C'
+stud$Grade3[stud$G3==10 | stud$G3==11]<-'D'
+stud$Grade3[stud$G3==0 | stud$G3==9]<-'E'
+
+attach(stud)
+stud<-stud[-c(31,32,33)]
+
+
+#STEP3:Create train/test set
+shuffle_index <- sample(1:nrow(stud))
+head(shuffle_index)
+stud <- stud[shuffle_index, ]
+
+
+#create_train_test(stud, size = 0.8, train = TRUE)
+
+create_train_test <- function(data, size = 0.8, train = TRUE) {
+  n_row = nrow(data)
+  total_row = size * n_row
+  train_sample  <- 1: total_row
+  if (train == TRUE) {
+    return (data[train_sample, ])
+  } else {
+    return (data[-train_sample, ])
+  }
+}
+
+data_train <- create_train_test(stud, 0.8, train = TRUE)
+data_test <- create_train_test(stud, 0.8, train = FALSE)
+dim(data_train)
+dim(data_test)
+
+
+prop.table(table(data_train$Grade1))
+
+#STEP4: Build the model
+
+tree<-rpart(Grade1~activities+higher+internet+nursery+paid+romantic+absences+health+freetime+goout+Dalc+Walc, data=stud, method='class')
+rpart.plot(tree,cex=.9,roundint = TRUE)
+
+#STEP5: Make a prediction
+pred<-predict(tree, stud, type = 'class')
+
+table_mat <- table(stud$Grade1, pred)
+table_mat
+
+#STEP6: Measure performance
+#ACCURACY=TP+TN/TP+TN+FP+FN
+
+accuracy_Test <- sum(diag(table_mat)) / sum(table_mat)
+print(paste('Accuracy for test', accuracy_Test))
+
+#Step 7) Tune the hyper-parameters
+
+accuracy_tune <- function(fit) {
+  predict_unseen <- predict(tree, stud, type = 'class')
+  table_mat <- table(stud$Grade1, pred)
+  accuracy_Test <- sum(diag(table_mat)) / sum(table_mat)
+  accuracy_Test
+}
+
+
+control <- rpart.control(minsplit = 20,
+                         minbucket = round(5 / 3),
+                         maxdepth = 4,
+                         cp = 0)
+tune_fit <- rpart(Grade1~activities+higher+internet+nursery+paid+romantic+absences+health+freetime+goout+Dalc+Walc, data = data_train, method = 'class', control = control)
+accuracy_tune(tune_fit)
+rpart.plot(tune_fit,cex=.6)
+
+
+
+pred<-predict(tune_fit, stud, type = 'class')
+
+table_mat <- table(stud$Grade1, pred)
+table_mat
+accuracy_Test <- sum(diag(table_mat)) / sum(table_mat)
+print(paste('Accuracy for test', accuracy_Test))
+
+
+```
+

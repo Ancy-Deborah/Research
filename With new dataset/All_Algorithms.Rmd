@@ -1,0 +1,220 @@
+---
+title: "All_Algorithms"
+author: "18PCSA102"
+date: "2/26/2020"
+output: html_document
+---
+
+```{r}
+
+library(tidyverse)
+library(randomForest)
+library(caret)
+library(rpart)
+library(xgboost)
+library(rpart.plot)
+stud <-read.csv(file.choose(),header = TRUE)
+
+#STEP2: Data cleaning
+
+stud<-na.omit(stud)
+stud$class[stud$G3>=10]<-'PASS'
+stud$class[stud$G3<10]<-'FAIL'
+attach(stud)
+
+#FINDING DEPENDENCY BETWEEN VARIABLES
+cor(failures,G3)
+cor(studytime,G3)
+cor(Fedu,G3)
+cor(traveltime,G3)
+cor(absences,G3)
+cor(Walc,G3)
+cor(Dalc,G3)
+
+
+chisq.test(class,paid)
+chisq.test(class,Fjob)
+chisq.test(class,Mjob)
+chisq.test(class,guardian)
+
+stud<-stud[-c(18)]
+stud$class<-as.factor(stud$class)
+
+
+
+#STEP3:Create train/test set
+set.seed(1)
+shuffle_index <- sample(1:nrow(stud))
+head(shuffle_index)
+stud <- stud[shuffle_index, ]
+
+
+#create_train_test(stud, size = 0.8, train = TRUE)
+
+create_train_test <- function(data, size = 0.8, train = TRUE) {
+  n_row = nrow(data)
+  total_row = size * n_row
+  train_sample  <- 1: total_row
+  if (train == TRUE) {
+    return (data[train_sample, ])
+  } else {
+    return (data[-train_sample, ])
+  }
+}
+
+data_train <- create_train_test(stud, 0.8, train = TRUE)
+data_test <- create_train_test(stud, 0.8, train = FALSE)
+dim(data_train)
+dim(data_test)
+prop.table(table(data_train$class))
+
+```
+
+
+<h2>GRADIENT BOOSTING</h2>
+```{r}
+model <- train(class~failures+studytime+G2+higher+absences+goout+Walc+famrel+reason+Fedu+internet+Fjob, data = data_train, method ="xgbTree", trControl = trainControl("cv", number=10))
+model$bestTune
+
+# Make predictions on the test data
+predicted.classes <-predict(model,data_test)
+
+
+#CALCULATING THE ACCURACY
+table_mat<-table(data_test$class,predicted.classes)
+precision<-table_mat[2,2]/sum(diag(table_mat))
+cat("Precision",precision)
+
+recal<-table_mat[2,2]/sum(table_mat[2,2],table_mat[1,2])
+cat("Recall value",recal)
+
+fmeasure<-(2*precision*recal)/sum(precision,recal)
+cat("F-measure",fmeasure)
+
+accuracy_Test <- sum(diag(table_mat)) / sum(table_mat)
+print(paste('Accuracy', accuracy_Test))
+
+```
+<h2>DECISION TREE</h2>
+```{r}
+control <- rpart.control(minsplit = 35,
+                         minbucket = round(30 / 2),
+                         maxdepth = 15,
+                         cp = 0)
+tree<-rpart(class~failures+studytime+G2+higher+absences+goout+Walc+famrel+reason+Fedu+internet+Fjob, data=data_train,method = 'class', control = control)
+rpart.plot(tree,extra=106,cex=.8,roundint = FALSE)
+
+pred<-predict(tree, data_test, type = 'class')
+table_mat <- table(data_test$class, pred)
+
+#CALCULATING THE ACCURACY
+precision<-table_mat[2,2]/sum(diag(table_mat))
+cat("Precision",precision)
+
+recal<-table_mat[2,2]/sum(table_mat[2,2],table_mat[1,2])
+cat("Recall value",recal)
+
+fmeasure<-(2*precision*recal)/sum(precision,recal)
+cat("F-measure",fmeasure)
+
+accuracy_Test <- sum(diag(table_mat)) / sum(table_mat)
+print(paste('Accuracy', accuracy_Test))
+
+
+
+
+```
+
+<h2>LOGISTIC REGRESSION</h2>
+```{r}
+mymodel<-glm(class~failures+studytime+G2+higher+absences+goout+Walc+famrel+reason+Fedu+internet+Fjob, family='binomial', data=data_train,maxit=100)
+
+restest<-predict(mymodel,data_test,type="response")
+confmatrix<-table(Actual_Value=data_test$class,Predicted_Value=restest>=0.5)
+#CALCULATING THE ACCURACY
+precision<-confmatrix[2,2]/sum(diag(confmatrix))
+cat("Precision",precision)
+
+recal<-confmatrix[2,2]/sum(confmatrix[2,2],confmatrix[1,2])
+cat("Recall value",recal)
+
+fmeasure<-(2*precision*recal)/sum(precision,recal)
+cat("F-measure",fmeasure)
+
+accuracy_Test <- sum(diag(confmatrix)) / sum(confmatrix)
+print(paste('Accuracy', accuracy_Test))
+
+
+
+```
+
+<h2>RANDOM FOREST</h2>
+```{r}
+rf<-randomForest(class~failures+studytime+G2+higher+absences+goout+Walc+famrel+reason+Fedu+internet+Fjob,data=data_train, mtry=12, ntree=500, importance=TRUE)
+rf
+
+prediction<-predict(rf,data_test,type="class")
+
+ConfusionMatric<-table(prediction,data_test$class)
+ConfusionMatric
+
+#CALCULATING THE ACCURACY
+precision<-ConfusionMatric[2,2]/sum(diag(ConfusionMatric))
+cat("Precision",precision)
+
+recal<-ConfusionMatric[2,2]/sum(ConfusionMatric[2,2],ConfusionMatric[1,2])
+cat("Recall value",recal)
+
+fmeasure<-(2*precision*recal)/sum(precision,recal)
+cat("F-measure",fmeasure)
+
+accuracy_Test <- sum(diag(ConfusionMatric)) / sum(ConfusionMatric)
+print(paste('Accuracy', accuracy_Test))
+
+
+
+```
+
+<h2>MLP</h2>
+```{r}
+library(RSNNS)
+#stud$school<-as.numeric(stud$school)
+stud$Mjob<-as.numeric(stud$Mjob)
+stud$Fjob<-as.numeric(stud$Fjob)
+stud$reason<-as.numeric(stud$reason)
+stud$guardian<-as.numeric(stud$guardian)
+stud$higher<-as.numeric(stud$higher)
+stud$internet<-as.numeric(stud$internet)
+stud$paid<-as.numeric(stud$paid)
+
+set.seed(400)
+stud <- stud[sample(1:nrow(stud),length(1:nrow(stud))),1:ncol(stud)]
+StudentValues <- stud[,1:17]
+StudentTargets <- decodeClassLabels(stud[,18])
+stud <- splitForTrainingAndTest(StudentValues, StudentTargets, ratio=0.20)
+na.omit(stud$targetsTrain)
+na.omit(stud$inputsTrain)
+model <- mlp(stud$inputsTrain, stud$targetsTrain, size=5, learnFuncParams=c(0.1), 
+  maxit=50, inputsTest=stud$inputsTest, targetsTest=stud$targetsTest)
+
+model
+predictions <- predict(model,stud$inputsTest)
+
+confusionMatrix(stud$targetsTrain,fitted.values(model))
+table_mat<-confusionMatrix(stud$targetsTest,predictions)
+table_mat
+#CALCULATING THE ACCURACY
+precision<-table_mat[2,2]/sum(diag(table_mat))
+cat("Precision",precision)
+
+recal<-table_mat[2,2]/sum(table_mat[2,2],table_mat[1,2])
+cat("Recall value",recal)
+
+fmeasure<-(2*precision*recal)/sum(precision,recal)
+cat("F-measure",fmeasure)
+
+accuracy_Test <- sum(diag(table_mat)) / sum(table_mat)
+print(paste('Accuracy', accuracy_Test))
+
+```
+

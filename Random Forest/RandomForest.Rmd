@@ -1,0 +1,77 @@
+---
+title: "RandomForest"
+author: "18PCSA102"
+date: "2/7/2020"
+output: html_document
+---
+
+
+```{r}
+#STEP1:IMPORT DATASET
+
+library(randomForest)
+library(caret)
+student <- read.csv(file.choose(), header = TRUE)
+
+#STEP2: CLEAN AND EXPLORE THE DATASET
+
+student<-na.omit(student)
+student$class[student$G3>=10]<-1
+student$class[student$G3<10]<-0
+attach(student)
+student<-student[-c(33)]
+str(student)
+dim(student)
+
+
+#STEP3: SPLIT THE DATASET
+student$class<-as.factor(student$class)
+set.seed(200) 
+data1_set_size= floor(nrow(student)*0.80)
+index<-sample(1:nrow(student),size=data1_set_size)
+
+training<-student[index,]
+testing<-student[-index,]
+
+
+
+#STEP4: Build the model
+rf<-randomForest(class~sex+school+address+Pstatus+failures+studytime+Medu+Fedu+traveltime+Fjob+Mjob+famrel+reason+Pstatus+famsize+schoolsup+famsup+age+guardian, data=training, mtry=10, ntree=300, importance=TRUE)
+rf
+plot(rf)
+result<-data.frame(testing$class, predict(rf, testing[,1:32], type="response"))
+result
+plot(result)
+
+
+#ACCURACY OF THE MODEL
+prediction<-predict(rf,testing,type="class")
+
+table_mat<-table(prediction,testing$class)
+
+
+confusionMatrix(prediction,testing$class)
+
+precision<-table_mat[2,2]/sum(diag(table_mat))
+cat("Precision",precision)
+
+recal<-table_mat[2,2]/sum(table_mat[2,2],table_mat[1,2])
+cat("Recall value",recal)
+
+fmeasure<-(2*precision*recal)/sum(precision,recal)
+cat("F-measure",fmeasure)
+
+accuracy_Test <- sum(diag(table_mat)) / sum(table_mat)
+print(paste('Accuracy', accuracy_Test))
+
+#STEP5:VARIABLE IMPORTANCE
+varImpPlot(rf,sort = T,main="Variable Importance",n.var=5)
+
+var.imp <- data.frame(importance(rf,type=2))
+# make row names as columns
+var.imp$Variables <- row.names(var.imp)
+var.imp[order(var.imp$MeanDecreaseGini,decreasing = T),]
+
+
+```
+

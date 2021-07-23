@@ -1,0 +1,46 @@
+---
+title: "Finding"
+author: "18PCSA110"
+date: "3/9/2020"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+stud <-read.csv(file.choose(),header = TRUE)
+
+#STEP2: Data cleaning
+
+stud<-na.omit(stud)
+stud$class[stud$G3>=10]<-'PASS'
+stud$class[stud$G3<10]<-'FAIL'
+attach(stud)
+
+stud$class<-as.factor(stud$class)
+
+#STEP3:Create train/test set
+set.seed(200)
+shuffle_index <- sample(1:nrow(stud))
+head(shuffle_index)
+
+data<-select(stud,sex,class)
+table(data)
+fdata<-filter(data,sex=='F')
+mdata<-filter(data,sex=='M')
+
+
+
+table(mdata$sex,mdata$class)
+table(fdata$sex,fdata$class)
+
+
+
+
+
+
+
+
+```
+
+
+

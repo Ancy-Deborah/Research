@@ -1,0 +1,49 @@
+---
+title: "AGE"
+author: "18PCSA102"
+date: "3/9/2020"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+stud <-read.csv(file.choose(),header = TRUE)
+
+stud<-na.omit(stud)
+stud$class[stud$G3>=10]<-'PASS'
+stud$class[stud$G3<10]<-'FAIL'
+attach(stud)
+
+stud$class<-as.factor(stud$class)
+
+
+set.seed(200)
+shuffle_index <- sample(1:nrow(stud))
+head(shuffle_index)
+
+data<-select(stud,age,class)
+table(data)
+
+age15<-filter(data,age==15)
+table(age15)
+
+age16<-filter(data,age==16)
+table(age16)
+
+age17<-filter(data,age==17)
+table(age17)
+
+age18<-filter(data,age==18)
+table(age18)
+
+age19<-filter(data,age==19)
+table(age19)
+
+age20<-filter(data,age==20)
+table(age20)
+
+age21<-filter(data,age==21)
+table(age21)
+
+```
+

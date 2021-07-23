@@ -1,0 +1,45 @@
+---
+title: 'HEALTH'
+author: "18PCSA102"
+date: "3/9/2020"
+output: html_document
+---
+
+```{r}
+
+library(dplyr)
+stud <-read.csv(file.choose(),header = TRUE)
+
+stud<-na.omit(stud)
+stud$class[stud$G3>=10]<-'PASS'
+stud$class[stud$G3<10]<-'FAIL'
+attach(stud)
+
+stud$class<-as.factor(stud$class)
+
+
+set.seed(200)
+shuffle_index <- sample(1:nrow(stud))
+head(shuffle_index)
+
+data<-select(stud,health,class)
+table(data)
+
+health1<-filter(data,health==1)
+table(health1)
+
+health2<-filter(data,health==2)
+table(health2)
+
+health3<-filter(data,health==3)
+table(health3)
+
+health4<-filter(data,health==4)
+table(health4)
+
+health5<-filter(data,health==5)
+table(health5)
+
+
+
+```
